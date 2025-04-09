@@ -5,19 +5,14 @@ function [Bpq,ierr]=BpqxyKummerC(x,y,p,q)
 %To be used for y>y0
 %---------------------------------------------
 ierr=0;
-rmax=10000;
+rmax=5000;
 huge=realmax/100;
 argu=0.5*x*y;
 a=p+q;
 b=p;
 eta=1-y;
-if a>100 && b>100 && argu>100
-  ich=1;
-else
-  ich=0;
-end  
-m1=Mabx(a,b,argu,ich);
-if isinf(m1)>0
+[m1,ier]=Mabx(a,b,argu);
+if ier>0
   ierr=1;
   Bpq=0;
 else  
@@ -30,7 +25,7 @@ else
   while abs(vt/m1)>=eps && mm1<huge && r<rmax
     v=v*eta;
     v2=v2*(a+r-1)/(q+r);
-    mm1=Mabx(a+r,b,argu,ich);
+    mm1=Mabx(a+r,b,argu);
     vt=v*v2*mm1;
     m1=m1+vt;
     r=r+1;
@@ -77,15 +72,84 @@ F=sqrt(p*q/s/(2*pi))*E;
 b = F*gamstar(p+q)/(gamstar(p)*gamstar(q));
 end
 
-function Mkummer=Mabx(a,b,z,ich)
-if ich==1
-  Mkummer= Mabzlps(a,b,z,0);
-else   
-  Mkummer=Mabxseries(a,b,z);
+function [Mkummer,ier]=Mabx(a,b,z)
+%----------------------------------------------------------
+% Computation of the confluent hypergeometric function
+% M(a,b,x) for positive values of the parameters a, b and
+% argument x
+%----------------------------------------------------------
+% Outputs:
+% Mkummer: M(a,b,x) function value
+% ier: error flag
+%     ier=0,  computation successful.
+%     ier=1,  some loss of accuracy is expected.
+%     ier=2,  overflow error
+%----------------------------------------------------------
+overf=1e+308;
+ier=0;
+if a>100 && b>100 && z>20
+  Mkummer= Mabxlps(a,b,z);
+else  
+  if a<1 && b<1 && z>30
+    [Mkummer,ier]=MabxlargexN(a,b,z);
+  else 
+    [Mkummer,ier]=Mabxseries(a,b,z);
+  end  
+end
+if isfinite(Mkummer)==0
+  Mkummer=overf;
+  ier=2;
+end   
+end
+
+function [m1,ier]=MabxlargexN(a,b,x)
+%---------------------------------------------------
+% Use of the large x asymptotics to compute M(a,b,x)
+% We will use this function for small a, b
+%---------------------------------------------------
+ier=0;
+ba=b-a;
+if ba>0.1
+  [m1,ier]=Mabxlargex(a,b,x); 
+else
+  bb1=b+1;
+  [m1a,iera]=Mabxlargex(a,b+1,x);
+  [m1b,ierb]=Mabxlargex(a,b+2,x);
+  m1=(1/(b*bb1))*(bb1*(b+x)*m1a-x*(bb1-a)*m1b);
+  if iera>0 || ierb>0
+    ier=1;
+  end  
 end
 end
 
-function m1=Mabxseries(a,b,x)
+function [m1,ier]=Mabxlargex(a,b,x)
+%---------------------------------------------------
+% Use of the large x asymptotics to compute M(a,b,x)
+%---------------------------------------------------
+ier=0;
+ba=b-a;
+m1=1;
+aa=1-a;
+v=1;
+r=1;
+while v>=m1*eps && r<10000
+  v=v/(x*r);
+  fact=(aa+r-1)*(ba+r-1);
+  v=v*fact;
+  m1=m1+v;
+  r=r+1;
+end
+m1=gamma(b)*exp(x)*x^(-ba)*m1/gamma(a);
+if r==10000
+  ier=1;
+end
+end
+
+function [m1,ier]=Mabxseries(a,b,x)
+%----------------------------------------
+% Use of series to compute M(a,b,x)
+%----------------------------------------
+ier=0;
 m1=1;
 v=1;
 r=1;
@@ -95,47 +159,28 @@ while v>=m1*eps && r<10000
   m1=m1+v;
   r=r+1;
 end
+if r==10000
+  ier=1;
 end
-
-function Mabz=Mabzlps(a,b,z,sca)
-%Expansion for large a, b, z. 
+end
+function Mabz=Mabxlps(a,b,z)
+%---------------------------------------------
+%Use of the expansion for large a, b, z. 
 %Computes M(a, b, z) with n=nmax coefficients.
-%sca=0, non-scaled
-%sca=1, scaled
-global ier
-ier=0;
+%---------------------------------------------
 nmax=5;
 alpha=a/z; beta=b/z;
 mu=beta-alpha;  w=beta+1;
 tau= 2/(w+sqrt(w^2-4*mu)); t0= mu*tau;
 fg0= 1/sqrt(beta*mu*tau^2-2*mu*tau+1);
-if sca==1 
-  calA= Amu(mu,tau,alpha);
-  Phi= exp(-z*calA)*fg0; 
-else
-  u= beta*tau; v= (1-t0)/(alpha*tau); 
-  Phi= exp(z*(1-t0))*gamstar(b)/gamstar(a)*sqrt(a/b)*fg0*u^b*v^a;
-end  
+u= beta*tau; v= (1-t0)/(alpha*tau);
+Phi= exp(z*(1-t0))*gamstar(b)/gamstar(a)*sqrt(a/b)*fg0*u^b*v^a;
 s=1; 
 for n=1:nmax 
   fgntilde= pqmutau(mu, tau, n); 
   s= s + fgntilde/z^n;
 end  
-if isinf(Phi)>0
-  ier=1;
-  Phi=realmax;
-end
-Mabz=Phi*s;
-end
-
-function Am=Amu(mu, tau, alpha)
-x= -mu*tau;
-if abs(x) < 0.5 
-  y= 2*atanh(x/(2+x)); 
-else
-  y= log(1+x);
-end  
-Am=mu*(tau-1-log(tau))-alpha*y;
+Mabz=Phi*s; 
 end
 
 function [fg]=pqmutau(mu, tau, n) 
