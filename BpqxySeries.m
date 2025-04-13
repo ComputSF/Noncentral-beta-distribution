@@ -1,4 +1,4 @@
-function [betanc,ierr]=BpqxySeries2(x,y,p,q)
+function [betanc,ierr]=BpqxySeries(x,y,p,q)
 % Computation of the series of B_(p,q)(x,y)  
 % using backward recursion
 ierr=0;

@@ -4,19 +4,16 @@ function [betanc, ier]=BpqxySeriesC(x,y,p,q)
 eps=1.e-15;
 Nmax=1000;
 r= p + q; 
-c=r-1;
+c=r;
 yy=1-y;
-pp=p;
-ib0= betaincreg(yy,  q,p-1); 
-ib= betaincreg(yy,  q,p); 
-s= ib; 
-s0= s;
-t= 1.0; 
+pp=p+1;
+ib0= betaincreg(yy,q,p); 
+ib= betaincreg(yy,q,p+1); 
+s= ib0+x*0.5*ib; 
+t= x*0.5; 
 d= 1.0; 
-n= 0;  
-pochterm= 1.0; 
+n= 1;  
 while abs(d) > eps && n< Nmax
-   pochterm= pochterm*(r+n)/(p+n);
    n= n+1; 
    ib2=((pp+c*y)*ib-c*y*ib0)/pp;
    ib0=ib;
@@ -27,7 +24,7 @@ while abs(d) > eps && n< Nmax
    t= t*u; 
    term= t*ib2; 
    s= s+term; 
-   d=term/s0;
+   d=term/s;
 end
 if n==Nmax
   ier=1;
