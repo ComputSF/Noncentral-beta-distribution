@@ -5,6 +5,7 @@ function [Bpq,ierr]=BpqxyKummerC(x,y,p,q)
 %To be used for y>y0
 %---------------------------------------------
 ierr=0;
+r = 0;
 rmax=5000;
 huge=realmax/100;
 argu=0.5*x*y;
